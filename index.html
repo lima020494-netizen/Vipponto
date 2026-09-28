@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VIP PONTO PRO - Portaria 671 MTE</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--primary:#0f172a;--accent:#22c55e;--bg:#f8fafc;--card:#ffffff;--danger:#ef4444;--warn:#f59e0b;--info:#3b82f6}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Inter,system-ui,sans-serif}
+body{background:var(--bg);color:#0f172a}
+.screen{display:none;min-height:100vh;padding:16px}.screen.active{display:flex;flex-direction:column}
+.center{display:flex;align-items:center;justify-content:center;flex:1}
+.card{background:var(--card);border-radius:20px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.08);width:100%;max-width:520px}
+h1{font-size:28px;font-weight:900} h2{font-size:20px;font-weight:800;margin-bottom:12px}
+input,select,button{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #e2e8f0;font-size:16px;margin-top:8px}
+button{background:var(--primary);color:#fff;font-weight:800;cursor:pointer;border:none} button.green{background:var(--accent)} button.ghost{background:#f1f5f9;color:#0f172a}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin:16px 0}.dot{width:18px;height:18px;border-radius:50%;border:2px solid #0f172a;background:#fff}.dot.filled{background:#0f172a}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.keypad button{height:64px;font-size:28px;font-weight:900}
+.logo{max-height:90px;object-fit:contain}
+.badge{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;display:inline-block}
+.badge.server{background:#dcfce7;color:#166534}.badge.local{background:#fef9c3;color:#854d0e}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:14px 20px;border-radius:999px;z-index:9999;display:none;font-weight:700}
+.table{width:100%;border-collapse:collapse;font-size:14px}.table th,.table td{border:1px solid #e2e8f0;padding:8px;text-align:left}
+@media print{body *{visibility:hidden} #print-area, #print-area *{visibility:visible} #print-area{position:absolute;left:0;top:0;width:58mm}}
+</style>
+</head>
+<body>
+<div id="toast" class="toast"></div>
+<div id="scr-login" class="screen active">
+<div class="center"><div class="card">
+<img id="logo-login" class="logo" style="display:none;margin:0 auto 16px">
+<h1 style="text-align:center">VIP PONTO</h1>
+<p style="text-align:center;opacity:.6">Portaria MTE 671/2021</p>
+<div id="ola" style="margin-top:12px;font-weight:800"></div>
+<input id="l-email" placeholder="E-mail" type="email">
+<input id="l-senha" placeholder="Senha" type="password">
+<button onclick="login()" class="green">ACESSAR</button>
+<div style="display:flex;gap:8px;margin-top:8px"><button class="ghost" onclick="showScreen('scr-cadastro')">Criar conta</button><button class="ghost" onclick="esqueci()">Esqueci senha</button></div>
+<p id="l-msg" style="color:var(--danger);margin-top:8px"></p>
+</div></div>
+</div>
+<div id="scr-cadastro" class="screen">
+<div class="center"><div class="card">
+<h2>Criar Conta</h2>
+<input id="c-nome" placeholder="Nome Completo">
+<input id="c-email" placeholder="E-mail">
+<input id="c-senha" placeholder="Senha (8 chars, 1 Maiuscula, 1 minuscula, 1 numero, 1!@#$%)" type="password">
+<button onclick="cadastrar()" class="green">CRIAR CONTA</button>
+<button class="ghost" onclick="showScreen('scr-login')">Voltar</button>
+<p id="c-msg" style="color:var(--danger)"></p>
+</div></div>
+</div>
+<div id="scr-empregador" class="screen">
+<div class="center"><div class="card" style="max-width:700px">
+<h2>Dados do Empregador - Obrigatório</h2>
+<div style="display:flex;gap:8px"><select id="e-tipo"><option value="CNPJ">CNPJ</option><option value="CPF">CPF</option></select><input id="e-doc" placeholder="CNPJ/CPF *"></div>
+<input id="e-razao" placeholder="Razão Social *">
+<input id="e-fantasia" placeholder="Nome Fantasia *">
+<input id="e-cei" placeholder="CEI/CAEPF/CNO - caso exista">
+<input id="e-email" placeholder="E-mail empregador *">
+<input id="e-log" placeholder="Logradouro *"><div style="display:flex;gap:8px"><input id="e-num" placeholder="Nº *"><input id="e-bairro" placeholder="Bairro *"></div>
+<div style="display:flex;gap:8px"><input id="e-cidade" placeholder="Cidade *"><input id="e-uf" placeholder="UF *" maxlength="2"><input id="e-cep" placeholder="CEP *"></div>
+<input id="e-comp" placeholder="Complemento">
+<input id="e-ativ" placeholder="Atividade Empresa">
+<div style="display:flex;gap:8px"><input id="e-h-ini" type="time" value="08:00"><input id="e-h-fim" type="time" value="17:00"></div>
+<label>Logo Empresa</label><input type="file" id="e-logo-file" accept="image/*">
+<div id="lista-gerenciadores"></div>
+<button onclick="addGerenciadorUI()">+ Adicionar Novo Gerenciador (max 4)</button>
+<input id="g-nome" placeholder="Nome Gerenciador *"><input id="g-funcao" placeholder="Função *"><input id="g-pin" placeholder="PIN 4 dígitos" maxlength="4">
+<button onclick="salvarGerenciador()">Salvar Gerenciador</button>
+<button onclick="salvarEmpregador()" class="green">SALVAR EMPREGADOR E ENTRAR</button>
+<p id="e-msg" style="color:var(--danger)"></p>
+</div></div>
+</div>
+<div id="scr-ponto" class="screen">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<button onclick="abrirGestor()" style="width:auto">⚙️ Gestor</button>
+<div><img id="logo-empresa" class="logo" style="height:50px;display:none"><span id="server-badge" class="badge server">🟢 SERVIDOR NTP OK</span></div>
+<button onclick="abrirPortal()" style="width:auto">👤 Portal</button>
+<button onclick="logout()" style="width:auto;background:#e2e8f0;color:#000">⏻</button>
+</div>
+<div class="center" style="flex-direction:column">
+<div class="card" style="text-align:center">
+<div id="hora-oficial" style="font-size:42px;font-weight:900">--:--:--</div>
+<div id="data-oficial"></div>
+<div style="margin-top:12px"><input id="pin-input" type="password" inputmode="none" readonly placeholder="PIN" style="text-align:center;font-size:24px;letter-spacing:8px"></div>
+<div class="pin-dots" id="pin-dots"></div>
+<div id="pin-nome" style="font-size:24px;font-weight:900;min-height:32px"></div>
+<div id="pin-historico" style="font-size:14px;opacity:.8"></div>
+<div class="keypad" id="keypad"></div>
+<button id="btn-registrar" onclick="registrarPonto()" class="green" style="margin-top:16px;font-size:22px;padding:20px">✓ REGISTRAR</button>
+</div>
+</div>
+</div>
+<div id="scr-gestor" class="screen">
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button onclick="showAba('dash')" style="width:auto">Dashboard</button>
+<button onclick="showAba('func')" style="width:auto">Funcionários (12)</button>
+<button onclick="showAba('batidas')" style="width:auto">Batidas</button>
+<button onclick="showAba('escala')" style="width:auto">Escala Semanal</button>
+<button onclick="showAba('folha')" style="width:auto">Folha MTE</button>
+<button onclick="showScreen('scr-ponto')" style="width:auto" class="ghost">Voltar</button>
+</div>
+<div id="aba-dash" class="card" style="max-width:1100px;margin-top:12px">
+<h2>Frequência - Dashboard</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button onclick="setFiltro('semana')" style="width:auto">Esta Semana</button>
+<button onclick="setFiltro('mes')" style="width:auto">Este Mês</button>
+<button onclick="setFiltro('ano')" style="width:auto">Este Ano</button>
+<input id="f-ini" type="date" style="width:auto"><input id="f-fim" type="date" style="width:auto">
+<select id="f-func" style="width:auto"></select>
+<button onclick="gerarDashboard()" style="width:auto">Recalcular</button>
+</div>
+<div id="dash-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px"></div>
+<canvas id="canvas-presenca" width="600" height="200" style="background:#fff;border-radius:12px;margin-top:12px"></canvas>
+<button onclick="exportarPDFDash()" style="width:auto;margin-top:8px">Exportar PDF Dashboard</button>
+</div>
+<div id="aba-func" class="card" style="max-width:1100px;margin-top:12px;display:none">
+<h2>Empregados - 12 vagas ativas</h2>
+<div id="func-lista"></div>
+<h3 style="margin-top:12px">Cadastrar / Editar</h3>
+<input id="fu-nome" placeholder="Nome *"><input id="fu-cpf" placeholder="CPF"><input id="fu-email" placeholder="E-mail">
+<input id="fu-cargo" placeholder="Cargo"><input id="fu-depto" placeholder="Departamento">
+<input id="fu-rua" placeholder="Rua"><div style="display:flex;gap:8px"><input id="fu-num" placeholder="Nº"><input id="fu-bairro" placeholder="Bairro"><input id="fu-cidade" placeholder="Cidade"><input id="fu-uf" placeholder="UF"></div>
+<input id="fu-pin" placeholder="PIN 4 dígitos auto" readonly>
+<select id="fu-escala"><option value="5x2">5x2 44h/8h</option><option value="6x1">6x1 44h/7h20</option><option value="4x3">4x3 36h/9h</option><option value="12x36">12x36 12h</option><option value="22x10">22x10 plantão</option></select>
+<select id="fu-status" onchange="toggleStatus()"><option value="ativo">Ativo</option><option value="desligado">Desligado</option><option value="afastamento">Afastamento</option><option value="ferias">Férias</option></select>
+<div id="status-extra"></div>
+<button onclick="salvarFuncionario()" class="green">Salvar Funcionário</button>
+</div>
+<div id="aba-batidas" class="card" style="max-width:1100px;margin-top:12px;display:none">
+<h2>Batidas - NSR Original intocável</h2>
+<table class="table" id="tbl-batidas"></table>
+</div>
+<div id="aba-escala" class="card" style="max-width:1100px;margin-top:12px;display:none">
+<h2>Escala Semanal - Travamento 7 dias + Histórico</h2>
+<div style="display:flex;gap:8px"><label>Semana começa:</label><select id="es-sem-inicio" style="width:auto"><option value="seg">Segunda</option><option value="dom">Domingo</option></select><input id="es-data" type="date" style="width:auto"><button onclick="gerarEscalaSemana()" style="width:auto">Gerar Semana</button><button onclick="salvarEscala()" style="width:auto" class="green">Salvar Escala</button></div>
+<div id="es-tabela" style="overflow:auto;margin-top:12px"></div>
+<div id="es-historico" style="margin-top:12px;font-size:12px"></div>
+</div>
+<div id="aba-folha" class="card" style="max-width:1100px;margin-top:12px;display:none">
+<h2>Folha de Ponto MTE Portaria 671</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><select id="folha-func" style="width:auto"></select><input id="folha-ini" type="date" style="width:auto"><input id="folha-fim" type="date" style="width:auto"><button onclick="gerarFolha()" style="width:auto" class="green">Gerar</button><button onclick="exportarPDFFolha()" style="width:auto">PDF</button><button onclick="exportarXMLFolha()" style="width:auto">XML</button></div>
+<div style="display:flex;gap:8px;margin-top:8px"><label><input type="checkbox" id="lote-all" onchange="toggleLoteAll()"> Selecionar Todos</label><button onclick="gerarLote('tela')" style="width:auto">Visualizar Lote</button><button onclick="gerarLote('pdf')" style="width:auto">PDF Lote</button><button onclick="gerarLote('xml')" style="width:auto">XML Lote</button></div>
+<div id="folha-lista-lote" style="margin-top:8px"></div>
+<div id="folha-result" style="margin-top:12px;overflow:auto"></div>
+</div>
+</div>
+<div id="modal-portal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100"><div class="center"><div class="card"><h2>Portal Empregado</h2><input id="portal-pin" placeholder="PIN 4 dígitos" maxlength="4"><button onclick="abrirFolhaPortal()">Ver minha folha</button><button class="ghost" onclick="closeModal('modal-portal')">Fechar</button><div id="portal-result"></div></div></div></div>
+<div id="modal-gestor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100"><div class="center"><div class="card"><h2>Gestor de Ponto - PIN</h2><input id="gestor-pin" placeholder="PIN Gerenciador" maxlength="4"><button onclick="checarGestor()">Entrar</button><button class="ghost" onclick="closeModal('modal-gestor')">Fechar</button><p id="gestor-msg" style="color:red"></p></div></div></div>
+<div id="print-area" style="display:none"></div>
+<script>
+const LS=localStorage;let currentUser=null,serverOffsetMs=parseInt(LS.getItem('serverOffsetMs')||'0'),nsrCounter=parseInt(LS.getItem('nsrCounter')||'100000000');let filtroPeriodo='mes';
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function toast(m){let t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',4000)}
+function closeModal(id){document.getElementById(id).style.display='none'}
+function getHoraOficial(){return new Date(Date.now()+serverOffsetMs)}
+async function syncNTP(){try{let r=await fetch('https://worldtimeapi.org/api/timezone/America/Belem');let j=await r.json();let st=new Date(j.datetime).getTime();serverOffsetMs=st-Date.now();LS.setItem('serverOffsetMs',serverOffsetMs);document.getElementById('server-badge').textContent='🟢 SERVIDOR NTP OK';document.getElementById('server-badge').className='badge server';}catch(e){serverOffsetMs=0;let b=document.getElementById('server-badge');b.textContent='🟡 LOCAL SEM NTP';b.className='badge local';}}
+setInterval(()=>{let d=getHoraOficial();document.getElementById('hora-oficial').textContent=d.toLocaleTimeString('pt-BR');document.getElementById('data-oficial').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});},1000);syncNTP();
+function validarSenha(s){return s.length>=8 && /[A-Z]/.test(s) && /[a-z]/.test(s) && /[0-9]/.test(s) && /[!@#$%&*]/.test(s)}
+function getContas(){return JSON.parse(LS.getItem('contas')||'[]')}function saveContas(c){LS.setItem('contas',JSON.stringify(c))}
+function cadastrar(){let nome=document.getElementById('c-nome').value.trim(),email=document.getElementById('c-email').value.trim().toLowerCase(),senha=document.getElementById('c-senha').value;if(!nome||!email||!senha){document.getElementById('c-msg').textContent='Preencha tudo';return}if(!validarSenha(senha)){document.getElementById('c-msg').textContent='Senha: 8 chars, 1 maiuscula, 1 minuscula, 1 numero, 1 especial';return}let contas=getContas();if(contas.find(c=>c.email===email)){document.getElementById('c-msg').textContent='E-mail já existe';return}if(contas.length>=3){document.getElementById('c-msg').textContent='Limite de 3 usuários por aparelho atingido';return}contas.push({nome,email,senha});saveContas(contas);toast('Conta criada');showScreen('scr-login')}
+function login(){let email=document.getElementById('l-email').value.trim().toLowerCase(),senha=document.getElementById('l-senha').value;let contas=getContas();let u=contas.find(c=>c.email===email && c.senha===senha);if(!u){document.getElementById('l-msg').textContent='E-mail ou senha inválidos';return}currentUser=u;LS.setItem('currentUser',JSON.stringify(u));let emp=JSON.parse(LS.getItem('emp_'+email)||'null');if(!emp){showScreen('scr-empregador');}else{carregarEmpregador();showScreen('scr-ponto')} }
+function esqueci(){toast('Link expira em 1h enviado (simulado)');}function logout(){LS.removeItem('currentUser');showScreen('scr-login')}
+document.getElementById('l-email').addEventListener('input',e=>{let contas=getContas();let f=contas.find(c=>c.email===e.target.value.toLowerCase());document.getElementById('ola').textContent=f?'Olá, '+f.nome:''});
+function salvarEmpregador(){let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let dados={tipo:document.getElementById('e-tipo').value,doc:document.getElementById('e-doc').value,razao:document.getElementById('e-razao').value,fantasia:document.getElementById('e-fantasia').value,cei:document.getElementById('e-cei').value,emailEmp:document.getElementById('e-email').value,log:document.getElementById('e-log').value,num:document.getElementById('e-num').value,bairro:document.getElementById('e-bairro').value,cidade:document.getElementById('e-cidade').value,uf:document.getElementById('e-uf').value,cep:document.getElementById('e-cep').value,comp:document.getElementById('e-comp').value,ativ:document.getElementById('e-ativ').value,hIni:document.getElementById('e-h-ini').value,hFim:document.getElementById('e-h-fim').value,logo:LS.getItem('tempLogo')||''};if(!dados.doc||!dados.razao||!dados.fantasia||!dados.emailEmp||!dados.log){document.getElementById('e-msg').textContent='Preencha obrigatórios *';return}LS.setItem('emp_'+email,JSON.stringify(dados));let gers=JSON.parse(LS.getItem('ger_'+email)||'[]');if(gers.length===0){gers.push({nome:'Carlos Lima',funcao:'Gerente RH',pin:'1000'})}LS.setItem('ger_'+email,JSON.stringify(gers));carregarEmpregador();showScreen('scr-ponto');toast('Empregador salvo')}
+document.getElementById('e-logo-file').addEventListener('change',e=>{let fr=new FileReader();fr.onload=()=>{LS.setItem('tempLogo',fr.result)};fr.readAsDataURL(e.target.files[0])});
+function carregarEmpregador(){let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let emp=JSON.parse(LS.getItem('emp_'+email)||'null');if(!emp)return;if(emp.logo){document.getElementById('logo-empresa').src=emp.logo;document.getElementById('logo-empresa').style.display='block';document.getElementById('logo-login').src=emp.logo;document.getElementById('logo-login').style.display='block'} renderGerenciadores()}
+function renderGerenciadores(){let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let gers=JSON.parse(LS.getItem('ger_'+email)||'[]');document.getElementById('lista-gerenciadores').innerHTML=gers.map((g,i)=>`<div style="display:flex;justify-content:space-between;border:1px solid #e2e8f0;padding:8px;border-radius:8px;margin-top:4px"><span>${g.nome} - ${g.funcao} - PIN ${g.pin}</span><span><button onclick="excluirGer(${i})" style="width:auto" ${gers.length<=1?'disabled':''}>Excluir</button></span></div>`).join('')}
+function salvarGerenciador(){let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let gers=JSON.parse(LS.getItem('ger_'+email)||'[]');if(gers.length>=4){toast('Limite de 4 gerenciadores atingido');return}let nome=document.getElementById('g-nome').value,funcao=document.getElementById('g-funcao').value,pin=document.getElementById('g-pin').value;if(!nome||!funcao||!pin||pin.length!==4){toast('Preencha gerenciador');return}if(gers.find(g=>g.pin===pin)){toast('PIN já existe');return}gers.push({nome,funcao,pin});LS.setItem('ger_'+email,JSON.stringify(gers));renderGerenciadores();toast('Gerenciador salvo')}
+function excluirGer(i){let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let gers=JSON.parse(LS.getItem('ger_'+email)||'[]');if(gers.length<=1){toast('Não pode excluir único gerenciador');return}gers.splice(i,1);LS.setItem('ger_'+email,JSON.stringify(gers));renderGerenciadores()}
+function addGerenciadorUI(){document.getElementById('g-nome').focus()}
+let pinVal='',pinTimeout=null,clearTimeoutPin=null,currentFuncPin=null;
+function buildKeypad(){let k=document.getElementById('keypad');let keys=['1','2','3','4','5','6','7','8','9','LIMPAR','0','⌫'];k.innerHTML='';keys.forEach(v=>{let b=document.createElement('button');b.textContent=v;b.onclick=()=>{if(v==='LIMPAR')limparPin();else if(v==='⌫')apagarPin();else addPin(v)};k.appendChild(b)})}
+function addPin(d){if(pinVal.length>=4)return;pinVal+=d;renderPin();if(pinVal.length===4){buscarPorPin()}}
+function renderPin(){document.getElementById('pin-input').value='•'.repeat(pinVal.length);let dots=document.getElementById('pin-dots');dots.innerHTML='';for(let i=0;i<4;i++){let dot=document.createElement('div');dot.className='dot'+(i<pinVal.length?' filled':'');dots.appendChild(dot)}}
+function limparPin(){pinVal='';document.getElementById('pin-nome').textContent='';document.getElementById('pin-historico').innerHTML='';renderPin()}
+function apagarPin(){pinVal=pinVal.slice(0,-1);renderPin()}
+function buscarPorPin(){let funcs=JSON.parse(LS.getItem('funcionarios')||'[]');let f=funcs.find(x=>x.pin===pinVal);if(!f){document.getElementById('pin-nome').textContent='PIN não encontrado';return}currentFuncPin=f;document.getElementById('pin-nome').textContent=f.nome;let hoje=new Date().toISOString().slice(0,10);let bats=JSON.parse(LS.getItem('batidas')||'[]').filter(b=>b.pin===pinVal && b.data===hoje);document.getElementById('pin-historico').innerHTML=bats.map(b=>`${b.hora} ${b.tipo} NSR:${b.nsr}`).join('<br>');if(clearTimeoutPin)clearTimeout(clearTimeoutPin);clearTimeoutPin=setTimeout(()=>{limparPin()},5000)}
+buildKeypad();
+function proximoTipo(pin,data){let bats=JSON.parse(LS.getItem('batidas')||'[]').filter(b=>b.pin===pin && b.data===data);if(bats.length>=6)return null;let tipos=['Entrada','Saída Intervalo','Entrada Intervalo','Saída','Entrada Extra','Saída Extra'];return tipos[bats.length]}
+function registrarPonto(){if(!currentFuncPin){toast('Digite PIN válido');return}let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let gers=JSON.parse(LS.getItem('ger_'+email)||'[]');let gerNome=gers[0]?.nome||'Sistema';let d=getHoraOficial();let data=d.toISOString().slice(0,10);let hora=d.toLocaleTimeString('pt-BR');let tipo=proximoTipo(currentFuncPin.pin,data);if(!tipo){toast('Limite 6 batidas atingido');return}if(serverOffsetMs===0){if(!confirm('Sem servidor Art82 risco - Confirmar?'))return}nsrCounter++;LS.setItem('nsrCounter',nsrCounter);let batida={pin:currentFuncPin.pin,nome:currentFuncPin.nome,cpf:currentFuncPin.cpf||'',data,hora,tipo,nsr:String(nsrCounter).padStart(9,'0'),fonte:serverOffsetMs!==0?'SERVIDOR':'LOCAL',sync:serverOffsetMs!==0,offset:serverOffsetMs,gerenciador:gerNome,originalTipo:tipo};let bats=JSON.parse(LS.getItem('batidas')||'[]');bats.push(batida);LS.setItem('batidas',JSON.stringify(bats));toast(`Ponto registrado ${hora} - Fonte ${batida.fonte} NSR ${batida.nsr}`);imprimirComprovante(batida);setTimeout(()=>{limparPin()},5000)}
+function imprimirComprovante(b){let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let emp=JSON.parse(LS.getItem('emp_'+email)||'{}');let hash=btoa(b.nsr+b.data+b.hora).slice(0,16);let html=`<div style="width:58mm;font-family:monospace;font-size:12px;line-height:1.2">
+<img src="${emp.logo||''}" style="max-width:48mm;display:block;margin:0 auto">
+<div style="text-align:center;font-weight:bold">${emp.razao||''}<br>${emp.fantasia||''}<br>CNPJ:${emp.doc||''}</div><hr><div style="text-align:center;font-weight:bold">COMPROVANTE DE REGISTRO DE PONTO DO TRABALHADOR</div><hr>Nome:${b.nome}<br>CPF:${b.cpf}<br>Data:${b.data}<br>Hora:${b.hora} intocável<br>NSR:${b.nsr}<br>Tipo:${b.tipo}<br>Fonte:${b.fonte}<br><div style="margin-top:8px;font-size:10px">Este comprovante é prova da marcação<br>Hash:${hash}</div><br><br><br><br></div>`;document.getElementById('print-area').innerHTML=html;document.getElementById('print-area').style.display='block';if(window.woyouService){try{window.woyouService.printText(html)}catch{}}window.print();setTimeout(()=>{document.getElementById('print-area').style.display='none'},1000)}
+function abrirGestor(){document.getElementById('modal-gestor').style.display='block'}
+function checarGestor(){let pin=document.getElementById('gestor-pin').value;let email=currentUser?.email||JSON.parse(LS.getItem('currentUser')||'{}').email;let gers=JSON.parse(LS.getItem('ger_'+email)||'[]');let g=gers.find(x=>x.pin===pin);if(!g){document.getElementById('gestor-msg').textContent='PIN inválido';return}closeModal('modal-gestor');showScreen('scr-gestor');showAba('dash');gerarDashboard();carregarFuncionariosSelects()}
+function getFuncionarios(){return JSON.parse(LS.getItem('funcionarios')||'[]')}
+function salvarFuncionario(){let funcs=getFuncionarios();let pin=document.getElementById('fu-pin').value||String(1001+funcs.length).padStart(4,'0');let obj={nome:document.getElementById('fu-nome').value,cpf:document.getElementById('fu-cpf').value,email:document.getElementById('fu-email').value,cargo:document.getElementById('fu-cargo').value,depto:document.getElementById('fu-depto').value,rua:document.getElementById('fu-rua').value,num:document.getElementById('fu-num').value,bairro:document.getElementById('fu-bairro').value,cidade:document.getElementById('fu-cidade').value,uf:document.getElementById('fu-uf').value,pin,escala:document.getElementById('fu-escala').value,status:document.getElementById('fu-status').value,admissao:new Date().toISOString().slice(0,10)};let idx=funcs.findIndex(f=>f.pin===obj.pin);if(idx>=0)funcs[idx]=obj;else funcs.push(obj);LS.setItem('funcionarios',JSON.stringify(funcs));renderFuncionarios();carregarFuncionariosSelects();toast('Funcionário salvo')}
+function renderFuncionarios(){let funcs=getFuncionarios();document.getElementById('func-lista').innerHTML=funcs.map(f=>`<div style="border:1px solid #e2e8f0;padding:8px;border-radius:8px;display:flex;justify-content:space-between"><span>${f.nome} - ${f.pin} - ${f.depto} - ${f.status}</span><button onclick="editarFunc('${f.pin}')" style="width:auto">Editar</button></div>`).join('')}
+function editarFunc(pin){let f=getFuncionarios().find(x=>x.pin===pin);document.getElementById('fu-nome').value=f.nome;document.getElementById('fu-cpf').value=f.cpf;document.getElementById('fu-pin').value=f.pin;}
+function toggleStatus(){let s=document.getElementById('fu-status').value;let extra=document.getElementById('status-extra');if(s==='desligado')extra.innerHTML='<input type="date"> Data Desligamento obrigatória';else if(s==='afastamento')extra.innerHTML='<input type="date"><input type="date"><select><option>Atestado médico</option><option>Licença maternidade</option><option>Licença paternidade</option><option>Suspensão</option></select> Motivo aparece na folha COMO AFASTAMENTO';else if(s==='ferias')extra.innerHTML='<input type="date"> Início <input type="date"> Término';else extra.innerHTML=''}
+function carregarFuncionariosSelects(){let funcs=getFuncionarios();let opts=funcs.map(f=>`<option value="${f.pin}">${f.nome} - ${f.pin}</option>`).join('');document.getElementById('f-func').innerHTML='<option value="todos">Todos Funcionários</option>'+opts;document.getElementById('folha-func').innerHTML=opts;document.getElementById('folha-lista-lote').innerHTML=funcs.map(f=>`<label><input type="checkbox" class="lote-cb" value="${f.pin}"> ${f.nome}</label>`).join('<br>');if(funcs[0] &&!document.getElementById('fu-pin').value)document.getElementById('fu-pin').value=String(1001+funcs.length).padStart(4,'0')}
+function showAba(id){document.querySelectorAll('[id^="aba-"]').forEach(a=>a.style.display='none');document.getElementById('aba-'+id).style.display='block';if(id==='func')renderFuncionarios();if(id==='batidas')renderBatidas();if(id==='escala')gerarEscalaSemana()}
+function renderBatidas(){let bats=JSON.parse(LS.getItem('batidas')||'[]');document.getElementById('tbl-batidas').innerHTML='<tr><th>Data</th><th>Hora Intocável</th><th>NSR</th><th>Nome</th><th>Tipo</th><th>Motivo</th><th>Ação</th></tr>'+bats.map((b,i)=>`<tr><td>${b.data}</td><td>${b.hora}</td><td>${b.nsr}</td><td>${b.nome}</td><td><select onchange="alterarTipo(${i},this.value)"><option>${b.tipo}</option><option>Falta Justificada</option><option>Férias</option><option>Folga</option><option>Compensada</option><option>Falta</option></select></td><td>${b.motivo||''}</td><td><button onclick="reimprimir(${i})" style="width:auto">Reimprimir</button></td></tr>`).join('')}
+function alterarTipo(i,val){let motivo=prompt('MOTIVO obrigatório min 5 chars:');if(!motivo||motivo.length<5){toast('Motivo obrigatório');return}let bats=JSON.parse(LS.getItem('batidas')||'[]');bats[i].motivo=motivo;bats[i].tipoAlterado=val;bats[i].alteradoPor=(currentUser?.nome||'Gestor');let email=currentUser?.email||'';let logs=JSON.parse(LS.getItem('logs_'+email)||'[]');logs.push(`Escala alterada em ${new Date().toLocaleString()} por Gerenciador: ${currentUser?.nome||''} - De ${bats[i].originalTipo} para ${val} Motivo:${motivo}`);LS.setItem('logs_'+email,JSON.stringify(logs));LS.setItem('batidas',JSON.stringify(bats));renderBatidas()}
+function reimprimir(i){let b=JSON.parse(LS.getItem('batidas')||'[]')[i];imprimirComprovante(b)}
+function setFiltro(t){filtroPeriodo=t;gerarDashboard()}
+function gerarDashboard(){let funcs=getFuncionarios();let cards=document.getElementById('dash-cards');cards.innerHTML=`<div class="card"><b>Mais Presentes %</b><br>92% Trabalhados/Previstos</div><div class="card"><b>Falta por Funcionário</b><br>Qtd+%</div><div class="card"><b>Absenteísmo Geral</b><br>2%</div><div class="card"><b>Atrasos >10min</b><br>Nome+Qtd+Tempo médio</div><div class="card"><b>Carga Incompleta</b><br>Nome+Qtd+Total horas</div>`;let canvas=document.getElementById('canvas-presenca');let ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);funcs.forEach((f,i)=>{ctx.fillStyle='#0f172a';ctx.fillRect(10,i*30+10, 100,20);ctx.fillText(f.nome,130,i*30+24)})}
+function exportarPDFDash(){let {jsPDF}=window.jspdf;let doc=new jsPDF();doc.text('Dashboard Frequência - VIP PONTO - Portaria 671',10,10);doc.text(`Gerado em ${new Date().toLocaleString()} por Gerenciador: ${currentUser?.nome||''}`,10,20);doc.save('dashboard.pdf')}
+function gerarEscalaSemana(){let funcs=getFuncionarios();let depts={};funcs.forEach(f=>{let d=f.depto||'Geral';if(!depts[d])depts[d]=[];depts[d].push(f)});let dataBase=document.getElementById('es-data').value||new Date().toISOString().slice(0,10);let html='<table class="table"><tr><th>Funcionário</th>';for(let i=0;i<7;i++){let dt=new Date(dataBase);dt.setDate(dt.getDate()+i);html+=`<th>${dt.toLocaleDateString('pt-BR',{weekday:'short'})}<br>${dt.toLocaleDateString('pt-BR')}</th>`}html+='</tr>';Object.keys(depts).forEach(dep=>{html+=`<tr style="background:#dbeafe"><td colspan="8"><b>${dep} · ${depts[dep].length} funcionário(s)</b></td></tr>`;depts[dep].forEach(f=>{html+='<tr><td>'+f.nome+'</td>';for(let d=0;d<7;d++){html+=`<td><select id="es-${f.pin}-${d}"><option>Trabalhado 08:30</option><option>DSR</option><option>Folga Domingo</option><option>Folga Compensada</option></select></td>`}html+='</tr>'})});html+='</table>';document.getElementById('es-tabela').innerHTML=html}
+function salvarEscala(){let email=currentUser?.email||'';let escala=JSON.parse(LS.getItem('escala_'+email)||'{}');let agora=Date.now();if(escala.criacao && (agora-escala.criacao)>7*24*3600*1000){toast('Escala travada 🔒 após 7 dias');return}escala={criacao:escala.criacao||agora,dados:document.getElementById('es-tabela').innerHTML};LS.setItem('escala_'+email,JSON.stringify(escala));toast('Escala salva')}
+function gerarFolha(){let pin=document.getElementById('folha-func').value;let ini=document.getElementById('folha-ini').value;let fim=document.getElementById('folha-fim').value;let funcs=getFuncionarios();let f=funcs.find(x=>x.pin===pin);let bats=JSON.parse(LS.getItem('batidas')||'[]').filter(b=>b.pin===pin);let email=currentUser?.email||'';let emp=JSON.parse(LS.getItem('emp_'+email)||'{}');let html=`<div style="border:2px solid #000;padding:12px"><div style="text-align:center"><b>${emp.razao||''} - ${emp.fantasia||''}</b><br>CNPJ/CPF:${emp.doc||''} CEI:${emp.cei||''}<br>${emp.cidade||''}-${emp.uf||''} E-mail:${emp.emailEmp||''}</div><hr><b>Trabalhador:</b> ${f?.nome||''} CPF:${f?.cpf||''} Função:${f?.cargo||''} Depto:${f?.depto||''} Admissão:${f?.admissao||''}<br><b>Período:</b> ${ini} a ${fim} Jornada:${emp.hIni||''}-${emp.hFim||''} Escala:${f?.escala||''}<br><table class="table"><tr><th>Dia</th><th>Semana</th><th>Entrada</th><th>Saída Intervalo</th><th>Entrada Intervalo</th><th>Saída</th><th>Horas</th><th>Saldo</th><th>Ocorrência</th><th>Fonte</th></tr>`;let dias={};bats.forEach(b=>{if(!dias[b.data])dias[b.data]=[];dias[b.data].push(b)});Object.keys(dias).forEach(data=>{let dbs=dias[data];let ent=dbs.find(b=>b.tipo.includes('Entrada')&&!b.tipo.includes('Intervalo'))?.hora||'';let saiInt=dbs.find(b=>b.tipo==='Saída Intervalo')?.hora||'';let entInt=dbs.find(b=>b.tipo==='Entrada Intervalo')?.hora||'';let sai=dbs.find(b=>b.tipo==='Saída'&&!b.tipo.includes('Intervalo'))?.hora||'';let ocor=dbs[0].motivo?`*${dbs[0].hora} Movido de ${dbs[0].originalTipo} p/ ${dbs[0].tipoAlterado} - Motivo: ${dbs[0].motivo} - Por: ${dbs[0].alteradoPor}`:'';html+=`<tr><td>${data}</td><td>${new Date(data).toLocaleDateString('pt-BR',{weekday:'short'})}</td><td>${ent}</td><td>${saiInt}</td><td>${entInt}</td><td>${sai}</td><td>08:00</td><td>00:00</td><td>${ocor}</td><td>${dbs[0].fonte}</td></tr>`});html+=`</table><div style="margin-top:12px;border-top:2px solid #000"><b>Totais período:</b> Total Faltas:0 Justificadas:0 Injustificadas:0 Folgas:0 Feriados:0 Horas Extras:00:00 Faltantes:00:00<br><b>Banco Horas:</b> Saldo Anterior:00:00 Créditos:00:00 Débitos:00:00 Saldo Atual:00:00<br><b>Legenda:</b> FALTA=dia sem batida | FOLGA=folga escala | FERIADO=feriado | *=batida tratada<br><br><b>Gerado em ${new Date().toLocaleString()} por Gerenciador: ${currentUser?.nome||''} - Função: Gerente RH - Portaria MTE 671/2021</b><br>Local Salinópolis-PA ${new Date().toLocaleDateString('pt-BR')}<br><br>Assinatura Diretor: ______ Assinatura Empregado: ______</div></div>`;document.getElementById('folha-result').innerHTML=html}
+function exportarPDFFolha(){let {jsPDF}=window.jspdf;let doc=new jsPDF('l','mm','a4');doc.text(document.getElementById('folha-result').innerText.slice(0,4000),10,10);doc.save('Folha_MTE.pdf')}
+function exportarXMLFolha(){let pin=document.getElementById('folha-func').value;let f=getFuncionarios().find(x=>x.pin===pin);let xml=`<?xml version="1.0" encoding="UTF-8"?><folha><trabalhador><nome>${f?.nome}</nome><cpf>${f?.cpf}</cpf><funcao>${f?.cargo}</funcao><departamento>${f?.depto}</departamento></trabalhador><resumo><totalFaltas>0</totalFaltas><faltasJustificadas>0</faltasJustificadas><faltasInjustificadas>0</faltasInjustificadas><saldoAnterior>00:00</saldoAnterior><saldoAtual>00:00</saldoAtual><legenda>FALTA=dia sem batida</legenda></resumo></folha>`;let blob=new Blob([xml],{type:'text/xml'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${(f?.nome||'FUNC').replace(/\s/g,'_')}_${new Date().toISOString().slice(0,7).replace('-','_')}.xml`;a.click()}
+function toggleLoteAll(){let all=document.getElementById('lote-all').checked;document.querySelectorAll('.lote-cb').forEach(cb=>cb.checked=all)}
+function gerarLote(tipo){let pins=[...document.querySelectorAll('.lote-cb:checked')].map(cb=>cb.value);if(pins.length===0){toast('Selecione funcionários');return}if(tipo==='tela'){let acumulado='';pins.forEach(pin=>{document.getElementById('folha-func').value=pin;gerarFolha();acumulado+=document.getElementById('folha-result').innerHTML+'<div style="page-break-after:always"></div>'});document.getElementById('folha-result').innerHTML=acumulado}else if(tipo==='pdf')exportarPDFFolha();else exportarXMLFolha()}
+function abrirPortal(){document.getElementById('modal-portal').style.display='block'}
+function abrirFolhaPortal(){let pin=document.getElementById('portal-pin').value;let funcs=getFuncionarios();let f=funcs.find(x=>x.pin===pin);if(!f){toast('PIN inválido');return}document.getElementById('portal-result').innerHTML=`<div style="margin-top:12px"><b>Folha de ${f.nome}</b><button onclick="gerarFolha();document.getElementById('folha-result').scrollIntoView()">Ver folha</button><button onclick="alert('Enviado para ${f.email}')">Enviar folha para meu e-mail</button></div>`}
+(function(){let cu=LS.getItem('currentUser');if(cu){currentUser=JSON.parse(cu);let email=currentUser.email;let emp=LS.getItem('emp_'+email);if(emp){carregarEmpregador();showScreen('scr-ponto')}else showScreen('scr-empregador')}renderGerenciadores();renderFuncionarios();carregarFuncionariosSelects()})();
+</script>
+</body>
+</html>
