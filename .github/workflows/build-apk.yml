@@ -1,4 +1,4 @@
-name: Gerar APK Vipponto
+name: Gerar APK Ponto Pro Gestao
 
 on:
   push:
@@ -8,30 +8,39 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Setup Java 17
+
+      - name: Configurar Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-      - name: Criar projeto Capacitor
-        run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init Vipponto com.vippontopro.app --web-dir="."
-          npx cap add android
-      - name: Build APK
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Adicionar plataforma Android
+        run: npx cap add android
+
+      - name: Sincronizar configuracoes do Capacitor
+        run: npx cap sync android
+
+      - name: Compilar APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
-      - name: Salvar APK
+
+      - name: Salvar APK para Download
         uses: actions/upload-artifact@v4
         with:
-          name: Vipponto-APK
+          name: PontoProGestao-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
